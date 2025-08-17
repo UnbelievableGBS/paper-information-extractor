@@ -88,23 +88,6 @@ def export_to_excel():
     except Exception as e:
         return jsonify({'error': f'Error exporting to Excel: {str(e)}'})
 
-if __name__ == '__main__':
-    # Create templates directory if it doesn't exist
-    if not os.path.exists('templates'):
-        os.makedirs('templates')
-    
-    # Create the HTML template
-    create_html_template()
-    
-    print("🌐 Starting Science.org Author Extractor Web Service...")
-    print("📝 Features:")
-    print("   - Search by paper title or direct Science.org URL")
-    print("   - Extract author information with ORCID, email, affiliations, roles")
-    print("   - Export to Excel with corresponding author highlighting")
-    print("\n🔗 Access the web interface at: http://localhost:5000")
-    
-    app.run(debug=True, host='0.0.0.0', port=5000)
-
 def create_html_template():
     """Create the HTML template for the web interface"""
     html_content = '''<!DOCTYPE html>
@@ -283,7 +266,7 @@ def create_html_template():
                 <div class="card author-card ${author.is_corresponding ? 'corresponding-author' : ''}">
                     <div class="card-body">
                         <h6 class="card-title">
-                            ${author.full_name}
+                            ${author.full_name_formatted || author.full_name}
                             ${author.is_corresponding ? '<span class="badge bg-danger ms-2">Corresponding</span>' : ''}
                         </h6>
                         ${author.orcid ? `<p class="mb-1"><strong>ORCID:</strong> <a href="https://orcid.org/${author.orcid}" target="_blank" class="orcid-link">${author.orcid}</a></p>` : ''}
@@ -324,3 +307,21 @@ def create_html_template():
         f.write(html_content)
     
     print("✅ HTML template created at templates/index.html")
+
+
+if __name__ == '__main__':
+    # Create templates directory if it doesn't exist
+    if not os.path.exists('templates'):
+        os.makedirs('templates')
+    
+    # Create the HTML template
+    create_html_template()
+    
+    print("🌐 Starting Science.org Author Extractor Web Service...")
+    print("📝 Features:")
+    print("   - Search by paper title or direct Science.org URL")
+    print("   - Extract author information with ORCID, email, affiliations, roles")
+    print("   - Export to Excel with corresponding author highlighting")
+    print("\n🔗 Access the web interface at: http://localhost:5000")
+    
+    app.run(debug=True, host='0.0.0.0', port=5000)

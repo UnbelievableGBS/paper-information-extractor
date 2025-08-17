@@ -8,16 +8,25 @@ import json
 
 def test_enhanced_extraction():
     """Test the enhanced extraction functionality"""
-    extractor = SciencePaperExtractor()
-    
-    # Test URL from user requirements
-    test_url = "https://www.science.org/doi/10.1126/scitranslmed.adn2601"
-    print(f"🔬 Testing Enhanced Extraction")
-    print(f"📄 Paper URL: {test_url}")
-    print("=" * 80)
-    
-    # Extract complete paper information
-    paper_info = extractor.extract_paper_info(test_url)
+    try:
+        extractor = SciencePaperExtractor()
+        
+        # Test URL from user requirements
+        test_url = "https://www.science.org/doi/10.1126/scitranslmed.adn2601"
+        print(f"🔬 Testing Enhanced Extraction")
+        print(f"📄 Paper URL: {test_url}")
+        print("=" * 80)
+        
+        # Extract complete paper information
+        paper_info = extractor.extract_paper_info(test_url)
+        
+        if not paper_info:
+            print("❌ Failed to extract paper information")
+            return None
+            
+    except Exception as e:
+        print(f"❌ Error during extraction: {e}")
+        return None
     
     # Display complete paper information
     print("📝 COMPLETE PAPER INFORMATION:")
@@ -35,7 +44,9 @@ def test_enhanced_extraction():
     
     for i, author in enumerate(authors, 1):
         print(f"\n🧑‍🔬 Author {i}:")
-        print(f"  📛 Full Name: {author.get('full_name', 'N/A')}")
+        # Show both regular and formatted names
+        formatted_name = author.get('full_name_formatted', author.get('full_name', 'N/A'))
+        print(f"  📛 Full Name: {formatted_name}")
         print(f"  🏷️  Given Name: {author.get('given_name', 'N/A')}")
         print(f"  🏷️  Family Name: {author.get('family_name', 'N/A')}")
         print(f"  🔗 ORCID: {author.get('orcid', 'N/A')}")
@@ -67,11 +78,14 @@ def test_enhanced_extraction():
     
     # Test Excel export
     print(f"\n📄 EXCEL EXPORT TEST:")
-    filename = extractor.export_to_excel(authors, 'enhanced_extraction_test.xlsx')
-    if filename:
-        print(f"✅ Excel export successful: {filename}")
-    else:
-        print("❌ Excel export failed")
+    try:
+        filename = extractor.export_to_excel(authors, 'enhanced_extraction_test.xlsx')
+        if filename:
+            print(f"✅ Excel export successful: {filename}")
+        else:
+            print("❌ Excel export failed")
+    except Exception as e:
+        print(f"❌ Excel export error: {e}")
     
     return paper_info
 

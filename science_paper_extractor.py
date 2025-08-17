@@ -4,7 +4,7 @@ import re
 from urllib.parse import urljoin, urlparse
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import time
 import json
 
@@ -29,6 +29,19 @@ class SciencePaperExtractor:
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"'
         })
+    
+    def __del__(self):
+        """Clean up session resources"""
+        try:
+            if hasattr(self, 'session') and self.session:
+                self.session.close()
+        except:
+            pass
+    
+    def close(self):
+        """Explicitly close the session"""
+        if hasattr(self, 'session') and self.session:
+            self.session.close()
     
     def search_paper_by_title(self, title: str) -> Optional[str]:
         """Search for a paper by title on Science.org and return the most relevant paper URL"""
@@ -66,7 +79,13 @@ class SciencePaperExtractor:
     
     def resolve_paper_url(self, input_text: str) -> Optional[str]:
         """Resolve input text to a Science.org paper URL"""
+        if not input_text or not isinstance(input_text, str):
+            return None
+            
         input_text = input_text.strip()
+        
+        if not input_text:
+            return None
         
         # Check if it's already a Science.org URL
         if input_text.startswith('https://www.science.org') and '/doi/' in input_text:
@@ -82,7 +101,7 @@ class SciencePaperExtractor:
         paper_info = self.extract_paper_info(paper_url)
         return paper_info.get('authors', [])
     
-    def extract_paper_info(self, paper_url: str) -> Dict[str, any]:
+    def extract_paper_info(self, paper_url: str) -> Dict[str, Any]:
         """
         Extract complete paper information including authors, affiliations, and abstract
         """
@@ -122,11 +141,12 @@ class SciencePaperExtractor:
     def _try_direct_access(self, paper_url: str) -> Optional[BeautifulSoup]:
         """Try direct access with Firefox headers that work"""
         # Update headers to use the successful Firefox configuration
+        # CRITICAL: Use 'identity' encoding to avoid compression issues
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
-            'Accept-Encoding': 'gzip, deflate, br',
+            'Accept-Encoding': 'identity',  # FIXED: No compression to avoid binary data
             'Referer': 'https://www.google.com/search?q=science+translational+medicine',
             'Origin': 'https://www.google.com',
             'Connection': 'keep-alive',
@@ -141,33 +161,39 @@ class SciencePaperExtractor:
     def _try_alternative_headers(self, paper_url: str) -> Optional[BeautifulSoup]:
         """Try with different headers to bypass restrictions"""
         alternative_session = requests.Session()
-        alternative_session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-us',
-            'Accept-Encoding': 'gzip, deflate',
-            'Referer': 'https://www.google.com/',
-            'Origin': 'https://www.google.com'
-        })
-        
-        time.sleep(3)
-        response = alternative_session.get(paper_url, timeout=20)
-        response.raise_for_status()
-        return BeautifulSoup(response.content, 'html.parser')
+        try:
+            alternative_session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-us',
+                'Accept-Encoding': 'gzip, deflate',
+                'Referer': 'https://www.google.com/',
+                'Origin': 'https://www.google.com'
+            })
+            
+            time.sleep(3)
+            response = alternative_session.get(paper_url, timeout=20)
+            response.raise_for_status()
+            return BeautifulSoup(response.content, 'html.parser')
+        finally:
+            alternative_session.close()
     
     def _try_with_delay(self, paper_url: str) -> Optional[BeautifulSoup]:
         """Try with longer delay and minimal headers"""
         minimal_session = requests.Session()
-        minimal_session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (compatible; Academic Research Bot; +https://example.com/bot)',
-        })
-        
-        time.sleep(5)
-        response = minimal_session.get(paper_url, timeout=30)
-        response.raise_for_status()
-        return BeautifulSoup(response.content, 'html.parser')
+        try:
+            minimal_session.headers.update({
+                'User-Agent': 'Mozilla/5.0 (compatible; Academic Research Bot; +https://example.com/bot)',
+            })
+            
+            time.sleep(5)
+            response = minimal_session.get(paper_url, timeout=30)
+            response.raise_for_status()
+            return BeautifulSoup(response.content, 'html.parser')
+        finally:
+            minimal_session.close()
     
-    def _extract_complete_paper_info(self, soup: BeautifulSoup, paper_url: str) -> Dict[str, any]:
+    def _extract_complete_paper_info(self, soup: BeautifulSoup, paper_url: str) -> Dict[str, Any]:
         """Extract complete paper information including authors, affiliations, abstract, and metadata"""
         paper_info = {
             'title': '',
@@ -258,6 +284,207 @@ class SciencePaperExtractor:
         
         return ''
     
+    def _decode_cloudflare_email(self, protected_path: str) -> str:
+        """
+        Decode CloudFlare protected email from the protection path
+        CloudFlare uses a simple XOR cipher to protect emails
+        """
+        try:
+            # Extract the hex encoded part
+            hex_part = protected_path.split('#')[-1]
+            
+            # Convert hex to bytes
+            encoded_bytes = bytes.fromhex(hex_part)
+            
+            # The first byte is the key for XOR decoding
+            key = encoded_bytes[0]
+            
+            # Decode the rest using XOR
+            decoded_chars = []
+            for byte in encoded_bytes[1:]:
+                decoded_chars.append(chr(byte ^ key))
+            
+            return ''.join(decoded_chars)
+        
+        except Exception as e:
+            print(f"❌ Error decoding CloudFlare email: {e}")
+            return ''
+
+    def _extract_all_emails_from_page(self, soup: BeautifulSoup) -> Dict[str, Dict[str, list]]:
+        """
+        Extract all email addresses from the page, including CloudFlare protected emails
+        Returns: {primary_email: {'cc_emails': [list], 'href': full_href, 'decoded': bool}}
+        """
+        all_emails = {}
+        
+        try:
+            # Method 1: Find regular mailto links
+            mailto_links = soup.find_all('a', href=re.compile(r'^mailto:'))
+            print(f"🔍 Found {len(mailto_links)} regular mailto links")
+            
+            for link in mailto_links:
+                href = link.get('href', '')
+                primary_email = link.get_text().strip()
+                
+                # Extract CC emails from href
+                cc_emails = []
+                if '?cc=' in href:
+                    cc_parts = href.split('?')[1].split('&')
+                    for part in cc_parts:
+                        if part.startswith('cc='):
+                            cc_email = part.replace('cc=', '')
+                            cc_emails.append(cc_email)
+                
+                all_emails[primary_email] = {
+                    'cc_emails': cc_emails,
+                    'href': href,
+                    'decoded': False
+                }
+                
+                print(f"  📧 Primary: {primary_email}")
+                if cc_emails:
+                    print(f"      CC: {', '.join(cc_emails)}")
+            
+            # Method 2: Find CloudFlare protected emails
+            cf_email_links = soup.find_all('a', href=re.compile(r'/cdn-cgi/l/email-protection'))
+            print(f"🔍 Found {len(cf_email_links)} CloudFlare protected email links")
+            
+            for link in cf_email_links:
+                href = link.get('href', '')
+                displayed_email = link.get_text().strip()
+                property_attr = link.get('property', '')
+                
+                # Decode the real email
+                decoded_email = self._decode_cloudflare_email(href)
+                
+                if decoded_email:
+                    print(f"  📧 Decoded: {displayed_email} -> {decoded_email}")
+                    
+                    # Parse if it's a mailto with CC emails
+                    if decoded_email.startswith('mailto:') or '?cc=' in decoded_email:
+                        # Clean up HTML entities
+                        decoded_email = decoded_email.replace('&amp;', '&')
+                        
+                        if decoded_email.startswith('mailto:'):
+                            decoded_email = decoded_email[7:]  # Remove 'mailto:'
+                        
+                        # Split primary and CC emails
+                        if '?' in decoded_email:
+                            primary_email = decoded_email.split('?')[0]
+                            cc_part = decoded_email.split('?')[1]
+                            
+                            cc_emails = []
+                            for part in cc_part.split('&'):
+                                if part.startswith('cc='):
+                                    cc_emails.append(part[3:])  # Remove 'cc='
+                        else:
+                            primary_email = decoded_email
+                            cc_emails = []
+                        
+                        all_emails[primary_email] = {
+                            'cc_emails': cc_emails,
+                            'href': f"mailto:{decoded_email}",
+                            'decoded': True,
+                            'displayed_text': displayed_email,
+                            'property': property_attr
+                        }
+                        
+                        print(f"    Primary: {primary_email}")
+                        if cc_emails:
+                            print(f"    CC: {', '.join(cc_emails)}")
+                    else:
+                        # Single email
+                        all_emails[decoded_email] = {
+                            'cc_emails': [],
+                            'href': f"mailto:{decoded_email}",
+                            'decoded': True,
+                            'displayed_text': displayed_email,
+                            'property': property_attr
+                        }
+                        print(f"    Single email: {decoded_email}")
+                        
+        except Exception as e:
+            print(f"❌ Error extracting emails from page: {e}")
+        
+        return all_emails
+
+    def _find_author_email(self, author_info: Dict[str, str], all_emails: Dict[str, Dict[str, list]], author_container) -> str:
+        """
+        Find the email address for a specific author based on name matching and proximity
+        """
+        author_name = author_info.get('full_name', '')
+        given_name = author_info.get('given_name', '')
+        family_name = author_info.get('family_name', '')
+        
+        if not author_name:
+            return ''
+            
+        try:
+            # Method 1: Check if there's an email link directly in this author's container
+            email_link = author_container.select_one('a[property="email"][aria-label="Email address"]')
+            if email_link:
+                email_text = email_link.get_text().strip()
+                if email_text in all_emails:
+                    return email_text
+            
+            # Method 2: Match based on name patterns in email addresses or nearby context
+            for primary_email, email_data in all_emails.items():
+                # Check if author name components appear in the email
+                email_local = primary_email.split('@')[0].lower()
+                
+                # Common patterns: firstlast, flast, first.last, f.last, lastf, etc.
+                name_patterns = []
+                if given_name and family_name:
+                    first_initial = given_name[0].lower()
+                    first_name_clean = given_name.lower().replace('.', '').replace(' ', '')
+                    last_name_clean = family_name.lower().replace('.', '').replace(' ', '')
+                    
+                    name_patterns.extend([
+                        f"{first_name_clean}{last_name_clean}",  # firstlast
+                        f"{first_initial}{last_name_clean}",     # flast
+                        f"{first_name_clean}.{last_name_clean}", # first.last
+                        f"{first_initial}.{last_name_clean}",    # f.last
+                        f"{last_name_clean}{first_initial}",     # lastf
+                        f"{last_name_clean}",                    # last
+                        first_name_clean,                        # first
+                    ])
+                
+                # Check if any pattern matches the email
+                for pattern in name_patterns:
+                    if pattern in email_local:
+                        return primary_email
+                
+                # Also check CC emails
+                for cc_email in email_data.get('cc_emails', []):
+                    cc_local = cc_email.split('@')[0].lower()
+                    for pattern in name_patterns:
+                        if pattern in cc_local:
+                            return cc_email
+            
+            # Method 3: Check proximity - look for email links near this author's ORCID or name
+            if author_container:
+                # Look for email links in the same container or nearby containers
+                nearby_containers = [author_container]
+                if author_container.parent:
+                    nearby_containers.extend(author_container.parent.find_all('div', limit=5))
+                
+                for container in nearby_containers:
+                    email_link = container.select_one('a[property="email"]')
+                    if email_link:
+                        email_text = email_link.get_text().strip()
+                        if email_text in all_emails:
+                            # Check if this author's name or ORCID is mentioned near this email
+                            container_text = container.get_text()
+                            if (author_name in container_text or 
+                                (given_name and given_name in container_text) or
+                                (family_name and family_name in container_text)):
+                                return email_text
+                        
+        except Exception as e:
+            print(f"❌ Error finding email for {author_name}: {e}")
+        
+        return ''
+
     def _extract_authors_with_affiliations(self, soup: BeautifulSoup) -> List[Dict[str, str]]:
         """Extract authors with their specific affiliations using the real Science.org structure"""
         authors = []
@@ -270,6 +497,10 @@ class SciencePaperExtractor:
                 return []
             
             print("🔍 Analyzing core-authors section for detailed extraction...")
+            
+            # First, extract all email information from the page
+            all_emails = self._extract_all_emails_from_page(soup)
+            print(f"📧 Found {len(all_emails)} email addresses: {list(all_emails.keys())}")
             
             # Find all author containers
             author_containers = core_authors_section.select('div[property=\"author\"]')
@@ -307,11 +538,18 @@ class SciencePaperExtractor:
                     if orcid_match:
                         author_info['orcid'] = orcid_match.group(1)
                 
-                # Check for corresponding author (email link or asterisk)
-                email_link = author_container.select_one('a[aria-label=\"Email address\"]')
-                if email_link:
+                # Extract real email addresses using the new method
+                author_email = self._find_author_email(author_info, all_emails, author_container)
+                if author_email:
+                    author_info['email'] = author_email
                     author_info['is_corresponding'] = True
-                    author_info['email'] = '[email protected]'  # Science.org protects emails
+                    print(f"  📧 Found real email for {author_info['full_name']}: {author_email}")
+                
+                # Check for email link indicator even if no real email found
+                email_link = author_container.select_one('a[aria-label=\"Email address\"]')
+                if email_link and not author_info['email']:
+                    author_info['is_corresponding'] = True
+                    author_info['email'] = '[email protected]'  # Fallback for protected emails
                 
                 # Check for asterisk marker for corresponding author
                 if '*' in author_container.get_text():
@@ -340,8 +578,25 @@ class SciencePaperExtractor:
                     author_info['profile_link'] = f"https://www.science.org/author/{name_slug}"
                 
                 if author_info['full_name']:
+                    # Add formatting symbols to the name
+                    formatted_name = author_info['full_name']
+                    
+                    # Add "#" for first author (index 0) or co-first authors
+                    if i == 0:
+                        formatted_name += " #"  # First author
+                    
+                    # Add "*" for corresponding authors
+                    if author_info['is_corresponding']:
+                        formatted_name += " *"  # Corresponding author
+                    
+                    # Update the full_name with formatting
+                    author_info['full_name_formatted'] = formatted_name
+                    
                     authors.append(author_info)
-                    print(f"  ✓ {i+1}. {author_info['full_name']} ({len(affiliations)} affiliations)")
+                    corresponding_indicator = "📧 CORRESPONDING" if author_info['is_corresponding'] else ""
+                    first_author_indicator = "👑 FIRST AUTHOR" if i == 0 else ""
+                    status = f"{first_author_indicator} {corresponding_indicator}".strip()
+                    print(f"  ✓ {i+1}. {formatted_name} ({len(affiliations)} affiliations) {status}")
             
             print(f"✅ Successfully extracted {len(authors)} authors with detailed affiliations")
             
@@ -476,7 +731,7 @@ class SciencePaperExtractor:
         paper_id = doi_match.group(1) if doi_match else "scitranslmed.adn2601"
         
         # Create realistic authors based on typical Science Translational Medicine papers
-        return [
+        authors = [
             {
                 'full_name': 'Sarah M. Chen',
                 'given_name': 'Sarah M.',
@@ -555,6 +810,23 @@ class SciencePaperExtractor:
                 'is_corresponding': True
             }
         ]
+        
+        # Add formatting symbols to the demo authors
+        for i, author in enumerate(authors):
+            formatted_name = author['full_name']
+            
+            # Add "#" for first author (index 0)
+            if i == 0:
+                formatted_name += " #"  # First author
+            
+            # Add "*" for corresponding authors
+            if author.get('is_corresponding', False):
+                formatted_name += " *"  # Corresponding author
+            
+            # Update the full_name with formatting
+            author['full_name_formatted'] = formatted_name
+        
+        return authors
     
     def _find_author_section_by_path(self, soup: BeautifulSoup) -> Optional[any]:
         """
@@ -1511,6 +1783,13 @@ class SciencePaperExtractor:
     
     def export_to_excel(self, authors: List[Dict[str, str]], filename: str = 'science_authors.xlsx'):
         """Export author information to Excel file with corresponding author highlighting"""
+        if not authors or not isinstance(authors, list):
+            print("❌ No valid author data to export")
+            return None
+            
+        if not filename or not isinstance(filename, str):
+            filename = 'science_authors.xlsx'
+            
         try:
             wb = Workbook()
             ws = wb.active
@@ -1547,8 +1826,9 @@ class SciencePaperExtractor:
             for row, author in enumerate(authors, 3):
                 is_corresponding = author.get('is_corresponding', False)
                 
-                # Full Name
-                cell = ws.cell(row=row, column=1, value=author.get('full_name', ''))
+                # Full Name - Use formatted name with symbols if available
+                formatted_name = author.get('full_name_formatted', author.get('full_name', ''))
+                cell = ws.cell(row=row, column=1, value=formatted_name)
                 if is_corresponding:
                     cell.font = corresponding_font
                     cell.fill = corresponding_fill
