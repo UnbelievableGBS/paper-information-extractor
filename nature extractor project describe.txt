@@ -1,0 +1,106 @@
+Project Requirements:
+
+We are building a tool to extract information from Nature journal papers. The user will input either the paper title or the URL of a Nature paper. The tool should extract the following information:
+
+Paper title
+Publication date
+Abstract
+Author information, which includes:
+All authors, with their affiliations (institutions and countries).
+For each author, we mark with:
+#for the first author or co-first authors.
+*for co-authors (i.e., other authors who are not first/co-first authors).
+Note: The author list must be in the same order as in the paper.
+Example output for author information (as a string):
+
+# First Author1 (Affiliation1, Country1)
+# First Author2 (Affiliation2, Country2)   [if co-first author]
+* Co-Author1 (Affiliation3, Country3)
+...
+Finally, the extracted information should be organized into a table with the following columns:
+
+Paper Title
+Publication Date
+Abstract
+Author Information (the string as above)
+Steps for extraction from a given URL (e.g., https://www.nature.com/articles/s41467-025-61342-8#author-information):
+
+Fetch the HTML content of the paper page.
+Parse the HTML using a parser (like BeautifulSoup).
+Extract the title from the main title element.
+Extract the publication date from the relevant element (look for a time element or a paragraph indicating publication).
+Extract the abstract from the abstract section.
+Extract the author list in order from the authors listed below the title (remove any superscripts for equal contribution, but note the superscript numbers for co-first authors by checking footnotes).
+Extract the affiliations: go to the "Authors and Affiliations" section and extract each institution and the authors belonging to that institution.
+Associate each author with their affiliation(s). An author may have multiple affiliations.
+Determine the first author and co-first authors:
+The first author is the first in the author list.
+If there is a footnote indicating co-first authors, mark all those authors as co-first authors (with #). Otherwise, mark only the first author as # and the rest as *.
+Format the author information string: for each author in the order of the author list, mark with # or * as determined, then list the author's name, and then in parentheses, list all their affiliations (with the country) separated by semicolons.
+Note: The country is usually the last part of the affiliation string (e.g., USA).
+
+Output: A table (for example, in markdown or just as a formatted text) with the four columns mentioned.
+
+Note: If the user inputs a paper title, we first need to search Nature to get the URL. However, the current requirement only asks for extraction given the URL or the exact title. But note that the user might not provide the URL, then we need to implement a search. However, the initial requirement is to implement extraction from a given URL or the exact title (which we can use to form a search URL). Since the project is already started, we focus on the extraction from a provided URL or exact title (if we have the URL we can extract directly; if we have the title, we might need to search for it on Nature). But the example only asks for extraction given the URL. So we can start with extraction by URL.
+
+But to be complete, the requirement should include:
+
+Input: a string that is either a Nature paper URL or the exact title of a Nature paper.
+Steps:
+If the input is a URL, extract directly.
+If the input is a title, then form a search query (e.g., using Nature's search API or by scraping the search results) to get the first matching paper's URL, then extract.
+However, the current task is to implement the extraction from the paper page (given the URL).
+
+We'll focus on the extraction part.
+
+We now write the requirement for the extraction function:
+
+Function: extract_nature_paper_info(url)
+
+Input: a string URL of a Nature paper
+
+Output: a dictionary with keys: "Paper Title", "Publication Date", "Abstract", "Author Information"
+
+Steps:
+
+Request the URL and get HTML.
+Parse the HTML with BeautifulSoup.
+Extract title.
+Extract publication date.
+Extract abstract.
+Extract author information as described.
+Given the complexity of the author extraction, we break down step 6:
+
+Sub-steps for author extraction:
+
+a. Find the author list in the main article header. This is usually in a <ul> with class "c-author-list" or similar. Each author is a <li>. Extract the author names and note any superscripts (for equal contribution).
+
+b. Check if there is a footnotes section for author contributions (common for co-first authors). Usually, if there are co-first authors, there will be a footnote like "These authors contributed equally." and the superscripts (e.g., 1,2) will be on the author names. Then, all authors with that superscript are co-first authors.
+
+c. Extract the "Authors and Affiliations" section. This section lists institutions (with an identifier like #Aff1) and then the authors associated by that identifier. But sometimes it is grouped without identifiers, but by grouping authors under an institution as in the example.
+
+d. Associate authors with their institutions. Since an author may have multiple institutions, we need to collect all institutions for each author.
+
+e. Format each author line with the mark (# or *) followed by the author name, then list of institutions (each institution as a string) in parentheses. Multiple institutions are separated by semicolon.
+
+f. The author information string is the concatenation of each formatted author line, separated by newline.
+
+Example of author information string (from the example):
+
+Filippo Iulianelli (Department of Physics, University of Southern California, Los Angeles, CA, USA)
+Sung Kim (Department of Mathematics, University of Southern California, Los Angeles, CA, USA)
+Joshua Sussan (Department of Mathematics, CUNY Medgar Evers, Brooklyn, NY, USA; Mathematics Program, The Graduate Center, CUNY, New York, NY, USA)
+Aaron D. Lauda (Department of Physics, University of Southern California, Los Angeles, CA, USA; Department of Mathematics, University of Southern California, Los Angeles, CA, USA)
+Note: In the example, only the first author is marked with #, the rest are *. This is because we did not find any co-first authors.
+
+However, note that in the example, Aaron D. Lauda is the last author and also the corresponding author, but we are not marking corresponding author, so we just use *.
+
+Finally, we return the dictionary and then output as a table.
+
+We assume we have the necessary libraries (requests, bs4) for the project.
+
+Now, we can start implementing the function.
+
+Note: This is a project requirement description for the next step of implementation. We have translated the user's requirement into a more detailed and structured description for the development of the extraction tool.
+
+ 
