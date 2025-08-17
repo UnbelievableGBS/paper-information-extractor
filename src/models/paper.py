@@ -32,6 +32,7 @@ class Author:
     orcid: Optional[str] = None
     affiliations: List[str] = None
     roles: List[AuthorRole] = None
+    external_links: Optional[Dict[str, str]] = None
     
     def __post_init__(self):
         if self.affiliations is None:
@@ -72,6 +73,7 @@ class Paper:
     volume: Optional[str] = None
     issue: Optional[str] = None
     pages: Optional[str] = None
+    contributions: Optional[str] = None
     extracted_at: Optional[datetime] = None
     
     def __post_init__(self):
@@ -102,7 +104,8 @@ class Paper:
                     "orcid": author.orcid,
                     "affiliations": author.affiliations,
                     "roles": [role.value for role in author.roles],
-                    "formatted_name": author.formatted_name
+                    "formatted_name": author.formatted_name,
+                    "external_links": author.external_links
                 }
                 for author in self.authors
             ],
@@ -113,6 +116,7 @@ class Paper:
             "volume": self.volume,
             "issue": self.issue,
             "pages": self.pages,
+            "contributions": self.contributions,
             "extracted_at": self.extracted_at.isoformat() if self.extracted_at else None,
             "metadata": {
                 "author_count": self.author_count,

@@ -4,7 +4,8 @@ No special cases, just straightforward extraction logic
 """
 
 import re
-from typing import Optional, List
+import time
+from typing import Optional, List, Dict
 from urllib.parse import urljoin
 
 from ..core import BaseExtractor
@@ -64,6 +65,7 @@ class NatureExtractor(BaseExtractor):
             # Extract metadata
             doi = self._extract_doi(soup)
             pub_date = self._extract_publication_date(soup)
+            contributions = self._extract_contributions(soup)
             
             paper = Paper(
                 title=title,
@@ -72,7 +74,8 @@ class NatureExtractor(BaseExtractor):
                 journal=self.journal_type,
                 url=url,
                 doi=doi,
-                publication_date=pub_date
+                publication_date=pub_date,
+                contributions=contributions
             )
             
             extraction_time = time.time() - start_time
@@ -135,56 +138,78 @@ class NatureExtractor(BaseExtractor):
         return ""
     
     def _extract_authors(self, soup) -> List[Author]:
-        """Extract authors from Nature paper with role detection"""
+        """Extract authors from Nature paper using detailed author search section"""
         authors = []
         
         try:
-            # Find author list
-            author_list = soup.find('ul', class_='c-author-list') or soup.find('div', class_='c-author-list')
-            if not author_list:
-                return authors
-            
-            # Get author elements
-            author_elements = author_list.find_all('li') or author_list.find_all('span', class_='author')
-            
-            # Get affiliations mapping
+            # Get affiliations mapping first
             affiliations_map = self._extract_affiliations_mapping(soup)
             
-            # Detect co-first authors from footnotes
-            co_first_symbols = self._detect_co_first_authors(soup)
+            # Get corresponding authors with emails
+            corresponding_authors = self._extract_corresponding_authors(soup)
             
-            for i, author_elem in enumerate(author_elements):
-                author_name = self.clean_text(author_elem.get_text())
+            # Find the detailed author list section
+            authors_list = soup.select("ol.c-article-authors-search > li")
+            
+            for i, li in enumerate(authors_list):
+                # Extract author name
+                name_elem = li.select_one(".js-search-name")
+                if not name_elem:
+                    continue
                 
-                # Clean author name (remove superscripts)
-                clean_name = re.sub(r'[0-9\*\†\‡\§\¶\#]+', '', author_name).strip()
+                clean_name = self.clean_text(name_elem.get_text())
                 if not clean_name:
                     continue
+                
+                # Extract affiliation IDs from li id attribute
+                li_id = li.get("id", "")
+                aff_ids = [part for part in li_id.split("-") if part.startswith("Aff")]
+                
+                # Get affiliations for this author
+                author_affiliations = []
+                for aff_id in aff_ids:
+                    if aff_id in affiliations_map:
+                        author_affiliations.append(affiliations_map[aff_id])
+                
+                # Extract external links
+                external_links = {}
+                for a in li.select("a.c-article-identifiers__item"):
+                    href = a.get("href", "")
+                    if "pubmed" in href.lower():
+                        external_links["PubMed"] = href
+                    elif "scholar.google" in href.lower():
+                        external_links["Google Scholar"] = href
+                
+                # Extract ORCID if available
+                orcid = None
+                orcid_link = li.find('a', href=lambda x: x and 'orcid.org' in x)
+                if orcid_link:
+                    orcid_url = orcid_link.get('href', '')
+                    orcid_match = re.search(r'(\d{4}-\d{4}-\d{4}-\d{3}[\dX])', orcid_url)
+                    if orcid_match:
+                        orcid = orcid_match.group(1)
                 
                 # Determine roles
                 roles = []
                 if i == 0:  # First author
                     roles.append(AuthorRole.FIRST)
                 
-                # Check for co-first author indicators
-                if any(symbol in author_name for symbol in co_first_symbols):
-                    if AuthorRole.FIRST not in roles:
-                        roles.append(AuthorRole.CO_FIRST)
-                
-                # Check for corresponding author (usually indicated by email or special marker)
-                if self._is_corresponding_author(author_elem, soup):
+                # Check if this is a corresponding author
+                corr_author = next((ca for ca in corresponding_authors if ca["name"] == clean_name), None)
+                if corr_author:
                     roles.append(AuthorRole.CORRESPONDING)
                 
                 if not roles:
                     roles.append(AuthorRole.REGULAR)
                 
-                # Get affiliations for this author
-                author_affiliations = self._get_author_affiliations(author_elem, affiliations_map)
-                
+                # Create author object
                 author = Author(
                     name=clean_name,
+                    email=corr_author["email"] if corr_author else None,
+                    orcid=orcid,
                     affiliations=author_affiliations,
-                    roles=roles
+                    roles=roles,
+                    external_links=external_links if external_links else None
                 )
                 
                 authors.append(author)
@@ -195,69 +220,53 @@ class NatureExtractor(BaseExtractor):
         return authors
     
     def _extract_affiliations_mapping(self, soup) -> dict:
-        """Extract affiliations mapping from Nature paper"""
+        """Extract clean affiliations mapping from Nature paper using reference approach"""
         affiliations = {}
         
-        # Look for affiliations section
-        affiliations_section = soup.find('section', {'data-title': 'Author information'}) or \
-                             soup.find('div', class_='affiliations')
+        # Use the same approach as reference implementation
+        aff_list = soup.select("ol.c-article-author-affiliation__list > li")
         
-        if affiliations_section:
-            affil_items = affiliations_section.find_all(['li', 'p'])
-            for item in affil_items:
-                text = self.clean_text(item.get_text())
-                if text:
-                    # Extract affiliation number/marker and text
-                    match = re.match(r'^(\d+)\s*(.+)', text)
-                    if match:
-                        number, affiliation = match.groups()
-                        affiliations[number] = affiliation
+        for li in aff_list:
+            aff_id = li.get("id")
+            
+            # Extract clean address
+            address_elem = li.select_one(".c-article-author-affiliation__address")
+            if address_elem:
+                clean_address = self.clean_text(address_elem.get_text())
+                if clean_address:
+                    affiliations[aff_id] = clean_address
         
         return affiliations
     
-    def _detect_co_first_authors(self, soup) -> List[str]:
-        """Detect co-first author symbols from footnotes"""
-        co_first_symbols = []
+    def _extract_corresponding_authors(self, soup) -> List[Dict[str, str]]:
+        """Extract corresponding authors with email addresses"""
+        corresponding_authors = []
         
-        # Look for footnotes mentioning equal contribution
-        footnotes = soup.find_all(['p', 'div'], text=re.compile(r'contributed equally|equal contribution', re.I))
+        # Extract from corresponding author list
+        corr_auths = soup.select("#corresponding-author-list a")
+        for a in corr_auths:
+            name = self.clean_text(a.get_text())
+            email = a.get("href", "").replace("mailto:", "")
+            if name and email:
+                corresponding_authors.append({
+                    "name": name,
+                    "email": email
+                })
         
-        for footnote in footnotes:
-            text = footnote.get_text()
-            # Extract symbols (usually superscript numbers or letters)
-            symbols = re.findall(r'[0-9\*\†\‡\§\¶\#]', text)
-            co_first_symbols.extend(symbols)
-        
-        return co_first_symbols
+        return corresponding_authors
     
-    def _is_corresponding_author(self, author_elem, soup) -> bool:
-        """Check if author is corresponding author"""
-        # Look for email in author element or nearby
-        author_text = author_elem.get_text()
+    def _extract_contributions(self, soup) -> Optional[str]:
+        """Extract author contributions section"""
+        try:
+            # Look for contributions section using the same approach as reference
+            contrib_elem = soup.select_one("#contributions + p")
+            if contrib_elem:
+                return self.clean_text(contrib_elem.get_text())
+        except Exception as e:
+            self.logger.error(f"Error extracting contributions: {e}")
         
-        # Check for email patterns
-        if re.search(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', author_text):
-            return True
-        
-        # Check for corresponding author indicators
-        if re.search(r'corresponding|contact|email', author_text, re.I):
-            return True
-        
-        return False
+        return None
     
-    def _get_author_affiliations(self, author_elem, affiliations_map: dict) -> List[str]:
-        """Get affiliations for specific author"""
-        affiliations = []
-        
-        # Extract affiliation numbers from author element
-        author_text = author_elem.get_text()
-        affil_numbers = re.findall(r'\d+', author_text)
-        
-        for number in affil_numbers:
-            if number in affiliations_map:
-                affiliations.append(affiliations_map[number])
-        
-        return affiliations
     
     def _extract_doi(self, soup) -> Optional[str]:
         """Extract DOI from Nature paper"""

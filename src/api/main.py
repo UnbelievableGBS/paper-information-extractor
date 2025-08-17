@@ -50,7 +50,7 @@ class ExtractionRequest(BaseModel):
     journal_hint: Optional[str] = Field(None, description="Optional journal hint (nature, science, aps)")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "input_text": "https://journals.aps.org/prxquantum/abstract/10.1103/PRXQuantum.6.010344",
                 "journal_hint": "aps"
@@ -64,7 +64,7 @@ class ExportRequest(BaseModel):
     filename: Optional[str] = Field(None, description="Optional custom filename")
     
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "format": "excel",
                 "filename": "my_paper.xlsx"
