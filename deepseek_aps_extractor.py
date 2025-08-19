@@ -4,6 +4,29 @@ import re
 import time
 import random
 
+def extract_aps_publication_date(soup):
+    """Extract publication date from APS paper HTML"""
+    pub_wrapper = soup.find('div', class_='pub-info-wrapper')
+    if pub_wrapper:
+        pub_strong = pub_wrapper.find('strong')
+        if pub_strong and 'Published' in pub_strong.get_text():
+            # Extract date from "Published DD Month, YYYY" format
+            date_text = pub_strong.get_text(strip=True)
+            date_match = re.search(r'Published\s+(.+)', date_text)
+            if date_match:
+                return date_match.group(1).strip()
+    return None
+
+def extract_aps_abstract(soup):
+    """Extract abstract from APS paper HTML"""
+    abstract_section = soup.find('div', id='abstract-section-content')
+    if abstract_section:
+        abstract_p = abstract_section.find('p')
+        if abstract_p:
+            # Keep the complete text with italic formatting preserved
+            return abstract_p.get_text(' ', strip=True)
+    return None
+
 def scrape_aps_authors(url):
     # FIXED: Complete browser headers that actually work for APS
     headers = {
@@ -48,6 +71,10 @@ def scrape_aps_authors(url):
     
     try:
         soup = BeautifulSoup(response.content, 'html.parser')
+        
+        # Extract publication date and abstract
+        pub_date = extract_aps_publication_date(soup)
+        abstract = extract_aps_abstract(soup)
         
         # Locate authors information area
         authors_wrapper = soup.find('div', class_='authors-wrapper')
@@ -139,12 +166,17 @@ def scrape_aps_authors(url):
         # Add the last author
         if current_author['name']:
             authors.append(current_author.copy())
-            
-        return authors
+        
+        # Return results with publication date and abstract
+        return {
+            'authors': authors,
+            'publication_date': pub_date,
+            'abstract': abstract
+        }
 
     except Exception as e:
         print(f"Error during extraction: {str(e)}")
-        return []
+        return {'authors': [], 'publication_date': None, 'abstract': None}
 
 # Usage example
 if __name__ == "__main__":
@@ -153,9 +185,15 @@ if __name__ == "__main__":
     paper_url = "https://journals.aps.org/prl/abstract/10.1103/76xj-j9qr"
     
     try:
-        authors_info = scrape_aps_authors(paper_url)
+        result = scrape_aps_authors(paper_url)
+        authors_info = result.get('authors', [])
+        pub_date = result.get('publication_date')
+        abstract = result.get('abstract')
         
         # Format output results
+        print(f"\n📅 Publication Date: {pub_date if pub_date else 'Not found'}")
+        print(f"\n📄 Abstract: {abstract[:200] + '...' if abstract and len(abstract) > 200 else abstract or 'Not found'}")
+        
         if authors_info:
             print(f"\n✅ Successfully extracted {len(authors_info)} authors:")
             for i, author in enumerate(authors_info, 1):

@@ -2,6 +2,26 @@ import requests
 from bs4 import BeautifulSoup
 import json
 
+def extract_publication_date(soup):
+    """Extract publication date from Nature paper HTML"""
+    pub_date_elem = soup.select_one('li.c-article-identifiers__item time[datetime]')
+    if pub_date_elem:
+        return {
+            "iso_date": pub_date_elem.get("datetime"),
+            "formatted_date": pub_date_elem.get_text(strip=True)
+        }
+    return None
+
+def extract_abstract(soup):
+    """Extract abstract from Nature paper HTML"""
+    abstract_elem = soup.select_one('#Abs1-content p')
+    if abstract_elem:
+        # Remove citation links but keep the text flow
+        for sup in abstract_elem.find_all('sup'):
+            sup.decompose()
+        return abstract_elem.get_text(' ', strip=True)
+    return None
+
 def parse_nature_authors(url: str):
     headers = {
         "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
@@ -16,7 +36,9 @@ def parse_nature_authors(url: str):
         "authors": [],
         "affiliations": [],
         "contributions": "",
-        "corresponding_authors": []
+        "corresponding_authors": [],
+        "publication_date": extract_publication_date(soup),
+        "abstract": extract_abstract(soup)
     }
 
     # 1. Affiliations & authors (机构+作者对应关系)
