@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import re
 import time
 import random
+import json
 
 def extract_aps_publication_date(soup):
     """Extract publication date from APS paper HTML"""
@@ -26,6 +27,23 @@ def extract_aps_abstract(soup):
             # Keep the complete text with italic formatting preserved
             return abstract_p.get_text(' ', strip=True)
     return None
+
+def extract_aps_title(soup):
+    """Extract title from APS paper HTML"""
+    # Try multiple selectors for APS title
+    title_selectors = [
+        'h1.title',
+        'h1[data-behavior="title"]',
+        'h1.article-title',
+        '.title-wrapper h1',
+        'title'
+    ]
+    
+    for selector in title_selectors:
+        title_elem = soup.select_one(selector)
+        if title_elem:
+            return title_elem.get_text(' ', strip=True)
+    return "Unknown Title"
 
 def scrape_aps_authors(url):
     # FIXED: Complete browser headers that actually work for APS
@@ -72,9 +90,10 @@ def scrape_aps_authors(url):
     try:
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Extract publication date and abstract
+        # Extract publication date, abstract, and title
         pub_date = extract_aps_publication_date(soup)
         abstract = extract_aps_abstract(soup)
+        title = extract_aps_title(soup)
         
         # Locate authors information area
         authors_wrapper = soup.find('div', class_='authors-wrapper')
@@ -136,13 +155,13 @@ def scrape_aps_authors(url):
                     # Start new author
                     current_author = {
                         'name': element.text.strip(),
-                        'orcid': '',
+                        # 'orcid': '',
                         'affiliations': [],
                         'roles': []
                     }
                 # Handle ORCID links
-                elif 'orcid' in element.get('href', ''):
-                    current_author['orcid'] = element.get('href', '')
+                # elif 'orcid' in element.get('href', ''):
+                    # current_author['orcid'] = element.get('href', '')
                     
             elif element.name == 'sup':
                 # Handle superscripts (affiliation and role markers)
@@ -167,12 +186,17 @@ def scrape_aps_authors(url):
         if current_author['name']:
             authors.append(current_author.copy())
         
-        # Return results with publication date and abstract
-        return {
+        # 格式化json输出
+        result = {
             'authors': authors,
             'publication_date': pub_date,
-            'abstract': abstract
+            'abstract': abstract,
+            'title': title,
+            'url': url
         }
+        result = json.dumps(result, indent=4)
+        # Return results with publication date and abstract
+        return result
 
     except Exception as e:
         print(f"Error during extraction: {str(e)}")
@@ -186,27 +210,28 @@ if __name__ == "__main__":
     
     try:
         result = scrape_aps_authors(paper_url)
-        authors_info = result.get('authors', [])
-        pub_date = result.get('publication_date')
-        abstract = result.get('abstract')
+        print(result)
+        # authors_info = result.get('authors', [])
+        # pub_date = result.get('publication_date')
+        # abstract = result.get('abstract')
         
-        # Format output results
-        print(f"\n📅 Publication Date: {pub_date if pub_date else 'Not found'}")
-        print(f"\n📄 Abstract: {abstract[:200] + '...' if abstract and len(abstract) > 200 else abstract or 'Not found'}")
+        # # Format output results
+        # print(f"\n📅 Publication Date: {pub_date if pub_date else 'Not found'}")
+        # print(f"\n📄 Abstract: {abstract[:200] + '...' if abstract and len(abstract) > 200 else abstract or 'Not found'}")
         
-        if authors_info:
-            print(f"\n✅ Successfully extracted {len(authors_info)} authors:")
-            for i, author in enumerate(authors_info, 1):
-                print(f"\nAuthor #{i}: {author['name']}")
-                print(f"  ORCID: {author['orcid'] if author['orcid'] else 'None'}")
-                print(f"  Affiliations: {', '.join(author['affiliations']) if author['affiliations'] else 'None'}")
-                print(f"  Roles: {', '.join(author['roles']) if author['roles'] else 'None'}")
-        else:
-            print("❌ No author information found")
-            print("This might be due to:")
-            print("  - Anti-bot protection")
-            print("  - Page structure changes")
-            print("  - Invalid URL")
+        # if authors_info:
+        #     print(f"\n✅ Successfully extracted {len(authors_info)} authors:")
+        #     for i, author in enumerate(authors_info, 1):
+        #         print(f"\nAuthor #{i}: {author['name']}")
+        #         print(f"  ORCID: {author['orcid'] if author['orcid'] else 'None'}")
+        #         print(f"  Affiliations: {', '.join(author['affiliations']) if author['affiliations'] else 'None'}")
+        #         print(f"  Roles: {', '.join(author['roles']) if author['roles'] else 'None'}")
+        # else:
+        #     print("❌ No author information found")
+        #     print("This might be due to:")
+        #     print("  - Anti-bot protection")
+        #     print("  - Page structure changes")
+        #     print("  - Invalid URL")
             
     except Exception as e:
         print(f"❌ Failed to extract authors: {e}")

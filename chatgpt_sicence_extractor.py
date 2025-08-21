@@ -20,6 +20,28 @@ def _extract_abstract(soup) -> str:
             return ' '.join(clean_text(p.get_text()) for p in paragraphs)
     return ""
 
+def _extract_publication_date(soup) -> str:
+    """Extract publication date from Science.org paper"""
+    date_element = soup.select_one('div.core-date-published span[property="datePublished"]')
+    if date_element:
+        return clean_text(date_element.get_text())
+    return ""
+
+def _extract_title(soup) -> str:
+    """Extract title from Science.org paper"""
+    title_selectors = [
+        'h1.article-title',
+        'h1[property="headline"]', 
+        'h1.core-title',
+        'title'
+    ]
+    
+    for selector in title_selectors:
+        title_element = soup.select_one(selector)
+        if title_element:
+            return clean_text(title_element.get_text())
+    return ""
+
 def parse_science_authors(url: str):
     # FIXED: Complete browser headers that actually work
     headers = {
@@ -83,13 +105,13 @@ def parse_science_authors(url: str):
             marks = [sup.get_text(strip=True) for sup in heading.find_all("sup")]
             author_info["marks"] = marks  # ["†", "*"]
 
-            # ORCID
-            orcid = heading.find("a", class_="orcid-id")
-            author_info["orcid"] = orcid["href"] if orcid else None
+            # # ORCID
+            # orcid = heading.find("a", class_="orcid-id")
+            # author_info["orcid"] = orcid["href"] if orcid else None
 
-            # Email (corresponding authors only)
-            email = heading.find("a", {"property": "email"})
-            author_info["email"] = email.get_text(strip=True) if email else None
+            # # Email (corresponding authors only)
+            # email = heading.find("a", {"property": "email"})
+            # author_info["email"] = email.get_text(strip=True) if email else None
 
         # Details (affiliations + contribution roles)
         content = author_div.find("div", class_="content")
@@ -122,16 +144,22 @@ def parse_science_authors(url: str):
             if label and content:
                 notes_info[label.get_text(strip=True)] = content.get_text(" ", strip=True)
 
-    # Extract abstract
+    # Extract abstract, publication date, and title
     abstract = _extract_abstract(soup)
+    publication_date = _extract_publication_date(soup)
+    title = _extract_title(soup)
 
     result = {
         "authors": authors_data,
-        "funding": funding_info,
+        # "funding": funding_info,
         "notes": notes_info,
-        "abstract": abstract
+        "abstract": abstract,
+        "publication_date": publication_date,
+        "title": title,
+        "url": url
     }
 
+    result = json.dumps(result, indent=4)
     return result
 
 
@@ -140,7 +168,7 @@ if __name__ == "__main__":
     url = "https://www.science.org/doi/10.1126/scitranslmed.ads7438"
     try:
         data = parse_science_authors(url)
-        print(json.dumps(data, indent=2, ensure_ascii=False))
+        print(data)
     except Exception as e:
         print(f"Error extracting data: {e}")
         print("This might be due to anti-bot protection or page structure changes.")
