@@ -41,6 +41,21 @@ def extract_contributions(soup):
     
     return None
 
+def extract_equal_contributions(soup):
+    """Extract equal contribution information from Nature paper HTML"""
+    # Look for equal contribution notes in author information section
+    equal_contrib_items = soup.select('li.c-article-author-information__item')
+    
+    equal_contributions = []
+    for item in equal_contrib_items:
+        text = item.get_text(strip=True)
+        equal_contributions.append(text)
+        # Check if this item contains equal contribution information
+        # if 'contributed equally' in text.lower() or 'equal contribution' in text.lower():
+        #     equal_contributions.append(text)
+    
+    return equal_contributions if equal_contributions else None
+
 def extract_institution_only(affiliation):
     """Extract only school/research institute from affiliation, removing departments and countries"""
     # First extract country
@@ -194,7 +209,8 @@ def parse_nature_authors(url: str):
         "countries": list(countries),
         "publication_date": extract_publication_date(soup),
         "abstract": extract_abstract(soup),
-        "contributions": extract_contributions(soup)
+        "contributions": extract_contributions(soup),
+        "equal_contributions": extract_equal_contributions(soup)
     }
 
 def create_nature_table(paper_data):
@@ -234,6 +250,7 @@ def create_nature_table(paper_data):
         "单位所属国家": "、".join(sorted(paper_data["countries"])) if paper_data["countries"] else "",
         "摘要": paper_data["abstract"] if paper_data["abstract"] else "",
         "贡献": paper_data["contributions"] if paper_data["contributions"] else "",
+        "共同贡献": "、".join(paper_data["equal_contributions"]) if paper_data["equal_contributions"] else "",
         "url": paper_data["url"]
     }
     

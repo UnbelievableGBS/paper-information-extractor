@@ -1,0 +1,16 @@
+# Paper Information Extractor Dependencies
+
+# Web scraping and HTTP requests
+requests>=2.31.0
+
+# HTML parsing
+beautifulsoup4>=4.12.0
+
+# LLM API client (DeepSeek via OpenAI-compatible interface)
+openai>=1.0.0
+
+# Data processing and Excel export
+pandas>=2.0.0
+
+# Optional: Excel file support (if needed for pandas Excel operations)
+openpyxl>=3.1.0

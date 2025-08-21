@@ -18,14 +18,16 @@ system_prompt = """
 1. 开头写明：发表日期、主要研究单位、期刊名称、论文标题（保持英文原题，括号内加中文翻译）。  
 2. 中间插入论文摘要（直接引用，但需将“我们”统一改为“研究者们”）。  
 3. 结尾描述：第一作者和通讯作者及其所属大学（单位只列到大学或者科研院所，不需要学院、系和实验室），国家信息，以及作者贡献（来自 JSON 的 "contributions" 字段）。  
+
 任务2:根据以下论文 JSON 信息，提取论文中的关键信息；
 要求2:
-输出论文第一作者/共同第一作者的单位
-输出论文通讯作者的单位，并在其单位后面标记“*”
-输出其他作者的单位
-输出所有作者的单位所属国家
-输出论文的url链接及论文名
-如果为英文，请将单位/国家翻译成中文
+1. 输出论文第一作者/共同第一作者的单位
+2. 输出论文通讯作者的单位，并在其单位后面标记“*”
+3. 输出其他作者的单位
+4. 输出所有作者的单位所属国家
+5. 输出论文的url链接及论文名
+6. 如果为英文，请将单位/国家翻译成中文
+7. 当未表示标识通讯作者时，则第一作者为通讯作者
 注意：作者单位单位只列到大学或者科研院所，不需要学院、系或实验室。
 
 输出的格式为：新闻风格介绍：xxx；论文信息提取：第一作者/共同作者单位：xxx，通讯作者单位：xxx，其他作者单位：所有作者单位所属国家：xxx，论文url链接：xxx，论文名：xxx
@@ -145,7 +147,7 @@ def main(url):
         paper_data = se.parse_science_authors(url)
         extracted_data = process_paper(paper_data)
     elif "aps" in url:
-        paper_data = ae.parse_aps_authors(url)
+        paper_data = ae.scrape_aps_authors(url)
         extracted_data = process_paper(paper_data)
     else:
         print("Invalid URL")
@@ -155,6 +157,11 @@ def main(url):
 
 # main function
 if __name__ == "__main__":
-    url = "https://www.nature.com/articles/s41567-025-02944-3"
+    url = "https://www.nature.com/articles/s41467-025-62786-8#author-information"
     extracted_data = main(url)
     print(extracted_data)
+
+    # save to excel
+
+    df = pd.DataFrame([extracted_data])
+    df.to_excel("extracted_data.xlsx", index=False)
