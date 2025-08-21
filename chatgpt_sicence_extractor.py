@@ -3,6 +3,22 @@ from bs4 import BeautifulSoup
 import json
 import time
 import random
+import re
+
+def clean_text(text: str) -> str:
+    """Clean extracted text by removing extra whitespace and normalizing"""
+    if not text:
+        return ""
+    return re.sub(r'\s+', ' ', text.strip())
+
+def _extract_abstract(soup) -> str:
+    """Extract abstract from Science.org paper"""
+    abstract_section = soup.find("section", id="abstract")
+    if abstract_section:
+        paragraphs = abstract_section.find_all("div", role="paragraph")
+        if paragraphs:
+            return ' '.join(clean_text(p.get_text()) for p in paragraphs)
+    return ""
 
 def parse_science_authors(url: str):
     # FIXED: Complete browser headers that actually work
@@ -106,10 +122,14 @@ def parse_science_authors(url: str):
             if label and content:
                 notes_info[label.get_text(strip=True)] = content.get_text(" ", strip=True)
 
+    # Extract abstract
+    abstract = _extract_abstract(soup)
+
     result = {
         "authors": authors_data,
         "funding": funding_info,
-        "notes": notes_info
+        "notes": notes_info,
+        "abstract": abstract
     }
 
     return result
