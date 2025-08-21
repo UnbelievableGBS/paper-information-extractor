@@ -1,7 +1,10 @@
+from operator import contains
 from openai import OpenAI
 import json
 import chatgpt_nature_extractor as cne
-import csv
+import chatgpt_sicence_extractor as cse
+import deepseek_aps_extractor as cae
+import pandas as pd
 import os
 import re
 
@@ -108,10 +111,10 @@ def extract_paper_info(response_text):
     
     return extracted
 
-def process_paper(url):
+def process_paper(paper_data):
     """Process a single paper and return structured data."""
     try:
-        paper_data = cne.parse_nature_authors(url)
+        # paper_data = cne.parse_nature_authors(url)
         print(f"Paper data: {json.dumps(paper_data, indent=2)}")
         
         content = json.dumps(paper_data, indent=4)
@@ -134,8 +137,19 @@ def process_paper(url):
         print(f"Error processing {url}: {e}")
         return None
 
-url = "https://www.nature.com/articles/s41567-025-02973-y"
-extracted_data = process_paper(url)
+url = "https://www.science.org/doi/10.1126/scitranslmed.ads7438"
+if "nature" in url:
+    paper_data = cne.parse_nature_authors(url)
+    extracted_data = process_paper(paper_data)
+elif "science" in url:
+    paper_data = cse.parse_science_authors(url)
+    extracted_data = process_paper(paper_data)
+elif "aps" in url:
+    paper_data = cae.parse_aps_authors(url)
+    extracted_data = process_paper(paper_data)
+else:
+    print("Invalid URL")
+    exit()
 
 if extracted_data:
     row = {
@@ -148,11 +162,8 @@ if extracted_data:
         "论文名": extracted_data["论文名"]
     }
     
-    with open("nature_information_output_new.csv", "a", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=row.keys())
-        if f.tell() == 0:
-            writer.writeheader()
-        writer.writerow(row)
+    df = pd.DataFrame([row])
+    df.to_excel("nature_information_output_new.xlsx", index=False)
         
     print("Data saved successfully")
 else:

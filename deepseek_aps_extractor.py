@@ -202,37 +202,37 @@ def scrape_aps_authors(url):
         print(f"Error during extraction: {str(e)}")
         return {'authors': [], 'publication_date': None, 'abstract': None}
 
-# Usage example
-if __name__ == "__main__":
-    # Replace with actual APS paper URL
-    # Replace with actual APS paper URL (working example)
-    paper_url = "https://journals.aps.org/prl/abstract/10.1103/76xj-j9qr"
+# # Usage example
+# if __name__ == "__main__":
+#     # Replace with actual APS paper URL
+#     # Replace with actual APS paper URL (working example)
+#     paper_url = "https://journals.aps.org/prl/abstract/10.1103/76xj-j9qr"
     
-    try:
-        result = scrape_aps_authors(paper_url)
-        print(result)
-        # authors_info = result.get('authors', [])
-        # pub_date = result.get('publication_date')
-        # abstract = result.get('abstract')
+#     try:
+#         result = scrape_aps_authors(paper_url)
+#         print(result)
+#         # authors_info = result.get('authors', [])
+#         # pub_date = result.get('publication_date')
+#         # abstract = result.get('abstract')
         
-        # # Format output results
-        # print(f"\n📅 Publication Date: {pub_date if pub_date else 'Not found'}")
-        # print(f"\n📄 Abstract: {abstract[:200] + '...' if abstract and len(abstract) > 200 else abstract or 'Not found'}")
+#         # # Format output results
+#         # print(f"\n📅 Publication Date: {pub_date if pub_date else 'Not found'}")
+#         # print(f"\n📄 Abstract: {abstract[:200] + '...' if abstract and len(abstract) > 200 else abstract or 'Not found'}")
         
-        # if authors_info:
-        #     print(f"\n✅ Successfully extracted {len(authors_info)} authors:")
-        #     for i, author in enumerate(authors_info, 1):
-        #         print(f"\nAuthor #{i}: {author['name']}")
-        #         print(f"  ORCID: {author['orcid'] if author['orcid'] else 'None'}")
-        #         print(f"  Affiliations: {', '.join(author['affiliations']) if author['affiliations'] else 'None'}")
-        #         print(f"  Roles: {', '.join(author['roles']) if author['roles'] else 'None'}")
-        # else:
-        #     print("❌ No author information found")
-        #     print("This might be due to:")
-        #     print("  - Anti-bot protection")
-        #     print("  - Page structure changes")
-        #     print("  - Invalid URL")
+#         # if authors_info:
+#         #     print(f"\n✅ Successfully extracted {len(authors_info)} authors:")
+#         #     for i, author in enumerate(authors_info, 1):
+#         #         print(f"\nAuthor #{i}: {author['name']}")
+#         #         print(f"  ORCID: {author['orcid'] if author['orcid'] else 'None'}")
+#         #         print(f"  Affiliations: {', '.join(author['affiliations']) if author['affiliations'] else 'None'}")
+#         #         print(f"  Roles: {', '.join(author['roles']) if author['roles'] else 'None'}")
+#         # else:
+#         #     print("❌ No author information found")
+#         #     print("This might be due to:")
+#         #     print("  - Anti-bot protection")
+#         #     print("  - Page structure changes")
+#         #     print("  - Invalid URL")
             
-    except Exception as e:
-        print(f"❌ Failed to extract authors: {e}")
-        print("Please check the URL and try again.")
+#     except Exception as e:
+#         print(f"❌ Failed to extract authors: {e}")
+#         print("Please check the URL and try again.")

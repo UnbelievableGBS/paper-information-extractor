@@ -240,33 +240,33 @@ def create_nature_table(paper_data):
     return pd.DataFrame([row])
 
 
-if __name__ == "__main__":
-    url = "https://www.nature.com/articles/s41567-025-02944-3"
+# if __name__ == "__main__":
+#     url = "https://www.nature.com/articles/s41567-025-02944-3"
     
-    try:
-        # Extract paper data
-        paper_data = parse_nature_authors(url)
-        ## 格式化输出
-        print(json.dumps(paper_data, indent=4))
+#     try:
+#         # Extract paper data
+#         paper_data = parse_nature_authors(url)
+#         ## 格式化输出
+#         print(json.dumps(paper_data, indent=4))
 
-        # # Create table with correct schema
-        # table = create_nature_table(paper_data)
-        # ## 保存到file
-        # with open("nature_information_output_new.json", "w") as f:
-        #     json.dump(paper_data, f)
+#         # # Create table with correct schema
+#         # table = create_nature_table(paper_data)
+#         # ## 保存到file
+#         # with open("nature_information_output_new.json", "w") as f:
+#         #     json.dump(paper_data, f)
             
-        # ## 保存到excel
-        # # Save to Excel file matching existing format
-        # output_file = "nature_information_output_new.xlsx"
-        # table.to_excel(output_file, index=False)
-        # print(f"✅ Data successfully saved to {output_file}")
+#         # ## 保存到excel
+#         # # Save to Excel file matching existing format
+#         # output_file = "nature_information_output_new.xlsx"
+#         # table.to_excel(output_file, index=False)
+#         # print(f"✅ Data successfully saved to {output_file}")
         
         
-        # # Display table for verification
-        # print("\n=== Generated Table ===")
-        # print(table.to_string(index=False))
+#         # # Display table for verification
+#         # print("\n=== Generated Table ===")
+#         # print(table.to_string(index=False))
         
-    except Exception as e:
-        print(f"❌ Error processing paper: {e}")
-        import traceback
-        traceback.print_exc()
+#     except Exception as e:
+#         print(f"❌ Error processing paper: {e}")
+#         import traceback
+#         traceback.print_exc()

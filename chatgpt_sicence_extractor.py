@@ -163,12 +163,12 @@ def parse_science_authors(url: str):
     return result
 
 
-if __name__ == "__main__":
-    # You can replace this with any Science paper URL
-    url = "https://www.science.org/doi/10.1126/scitranslmed.ads7438"
-    try:
-        data = parse_science_authors(url)
-        print(data)
-    except Exception as e:
-        print(f"Error extracting data: {e}")
-        print("This might be due to anti-bot protection or page structure changes.")
+# if __name__ == "__main__":
+#     # You can replace this with any Science paper URL
+#     url = "https://www.science.org/doi/10.1126/scitranslmed.ads7438"
+#     try:
+#         data = parse_science_authors(url)
+#         print(data)
+#     except Exception as e:
+#         print(f"Error extracting data: {e}")
+#         print("This might be due to anti-bot protection or page structure changes.")
