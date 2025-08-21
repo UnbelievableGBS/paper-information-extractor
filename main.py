@@ -1,9 +1,9 @@
 from operator import contains
 from openai import OpenAI
 import json
-import chatgpt_nature_extractor as cne
-import chatgpt_sicence_extractor as cse
-import deepseek_aps_extractor as cae
+import nature_extractor as ne
+import science_extractor as se
+import aps_extractor as ae
 import pandas as pd
 import os
 import re
@@ -137,34 +137,24 @@ def process_paper(paper_data):
         print(f"Error processing {url}: {e}")
         return None
 
-url = "https://www.science.org/doi/10.1126/scitranslmed.ads7438"
-if "nature" in url:
-    paper_data = cne.parse_nature_authors(url)
-    extracted_data = process_paper(paper_data)
-elif "science" in url:
-    paper_data = cse.parse_science_authors(url)
-    extracted_data = process_paper(paper_data)
-elif "aps" in url:
-    paper_data = cae.parse_aps_authors(url)
-    extracted_data = process_paper(paper_data)
-else:
-    print("Invalid URL")
-    exit()
+def main(url):
+    if "nature" in url:
+        paper_data = ne.parse_nature_authors(url)
+        extracted_data = process_paper(paper_data)
+    elif "science" in url:
+        paper_data = se.parse_science_authors(url)
+        extracted_data = process_paper(paper_data)
+    elif "aps" in url:
+        paper_data = ae.parse_aps_authors(url)
+        extracted_data = process_paper(paper_data)
+    else:
+        print("Invalid URL")
+        exit()
 
-if extracted_data:
-    row = {
-        "第一/共一作者单位": extracted_data["第一作者单位"],
-        "通讯作者单位": extracted_data["通讯作者单位"],
-        "其他作者单位": extracted_data["其他作者单位"],
-        "单位所属国家": extracted_data["单位所属国家"],
-        "新闻风格介绍": extracted_data["新闻风格介绍"],
-        "url": extracted_data["url"],
-        "论文名": extracted_data["论文名"]
-    }
-    
-    df = pd.DataFrame([row])
-    df.to_excel("nature_information_output_new.xlsx", index=False)
-        
-    print("Data saved successfully")
-else:
-    print("Failed to process paper")
+    return extracted_data
+
+# main function
+if __name__ == "__main__":
+    url = "https://www.nature.com/articles/s41567-025-02944-3"
+    extracted_data = main(url)
+    print(extracted_data)
