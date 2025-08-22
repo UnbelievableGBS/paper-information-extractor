@@ -119,6 +119,37 @@ def extract_title(soup):
         return title_elem.get_text(strip=True)
     return "Unknown Title"
 
+def extract_journal_name(soup):
+    """Extract journal name from Nature paper HTML"""
+    # Try multiple selectors for Nature journal name
+    journal_selectors = [
+        'meta[name="citation_journal_title"]',
+        'meta[property="og:site_name"]',
+        '.c-journal-title',
+        '.journal-title',
+        'h1.c-header__title',
+        'a.c-header__nav-link--home'
+    ]
+    
+    for selector in journal_selectors:
+        if selector.startswith('meta'):
+            journal_elem = soup.select_one(selector)
+            if journal_elem:
+                content = journal_elem.get('content', '').strip()
+                if content and content not in ['Nature', 'nature.com']:
+                    return content
+        else:
+            journal_elem = soup.select_one(selector)
+            if journal_elem:
+                text = journal_elem.get_text(' ', strip=True)
+                if text and text not in ['Nature', 'nature.com']:
+                    return text
+    
+    # Fallback: extract from URL pattern
+    # Nature journals follow pattern: nature.com/articles/JOURNAL-...
+    # or specific journal sites like nature.com/natphys/, etc.
+    return "Nature"
+
 def parse_nature_authors(url: str):
     """Parse Nature paper and extract structured author information"""
     headers = {
@@ -132,6 +163,7 @@ def parse_nature_authors(url: str):
 
     # Extract basic paper info
     title = extract_title(soup)
+    journal_name = extract_journal_name(soup)
     
     # Build affiliation map and author-affiliation mapping
     aff_list = soup.select("ol.c-article-author-affiliation__list > li")
@@ -204,6 +236,7 @@ def parse_nature_authors(url: str):
 
     return {
         "title": title,
+        "journal_name": journal_name,
         "url": url,
         "authors": authors_data,
         "countries": list(countries),

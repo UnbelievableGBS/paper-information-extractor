@@ -45,6 +45,33 @@ def extract_aps_title(soup):
             return title_elem.get_text(' ', strip=True)
     return "Unknown Title"
 
+def extract_aps_journal_name(soup):
+    """Extract journal name from APS paper HTML"""
+    # Try multiple selectors for APS journal name
+    journal_selectors = [
+        '.journal-title',
+        '.journal-name',
+        'meta[name="citation_journal_title"]',
+        'meta[property="og:site_name"]',
+        '.header-journal-title',
+        'h1.journal-title'
+    ]
+    
+    for selector in journal_selectors:
+        if selector.startswith('meta'):
+            journal_elem = soup.select_one(selector)
+            if journal_elem:
+                return journal_elem.get('content', '').strip()
+        else:
+            journal_elem = soup.select_one(selector)
+            if journal_elem:
+                return journal_elem.get_text(' ', strip=True)
+    
+    # Fallback: extract from URL pattern
+    # APS journals follow pattern: journals.aps.org/JOURNAL/...
+    # where JOURNAL could be prl, prb, pra, etc.
+    return "Physical Review (APS)"
+
 def scrape_aps_authors(url):
     # FIXED: Complete browser headers that actually work for APS
     headers = {
@@ -90,10 +117,11 @@ def scrape_aps_authors(url):
     try:
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # Extract publication date, abstract, and title
+        # Extract publication date, abstract, title, and journal name
         pub_date = extract_aps_publication_date(soup)
         abstract = extract_aps_abstract(soup)
         title = extract_aps_title(soup)
+        journal_name = extract_aps_journal_name(soup)
         
         # Locate authors information area
         authors_wrapper = soup.find('div', class_='authors-wrapper')
@@ -192,6 +220,7 @@ def scrape_aps_authors(url):
             'publication_date': pub_date,
             'abstract': abstract,
             'title': title,
+            'journal_name': journal_name,
             'url': url
         }
         result = json.dumps(result, indent=4)
@@ -200,7 +229,7 @@ def scrape_aps_authors(url):
 
     except Exception as e:
         print(f"Error during extraction: {str(e)}")
-        return {'authors': [], 'publication_date': None, 'abstract': None}
+        return {'authors': [], 'publication_date': None, 'abstract': None, 'journal_name': None}
 
 # # Usage example
 # if __name__ == "__main__":

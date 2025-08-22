@@ -42,6 +42,36 @@ def _extract_title(soup) -> str:
             return clean_text(title_element.get_text())
     return ""
 
+def _extract_journal_name(soup) -> str:
+    """Extract journal name from Science.org paper"""
+    # Try multiple selectors for Science journal name
+    journal_selectors = [
+        'meta[name="citation_journal_title"]',
+        'meta[property="og:site_name"]',
+        '.journal-banner-title',
+        '.journal-title',
+        'h1.journal-name',
+        '.core-self-citation-journal-name'
+    ]
+    
+    for selector in journal_selectors:
+        if selector.startswith('meta'):
+            journal_elem = soup.select_one(selector)
+            if journal_elem:
+                content = journal_elem.get('content', '').strip()
+                if content and content.lower() not in ['science.org', 'science']:
+                    return content
+        else:
+            journal_elem = soup.select_one(selector)
+            if journal_elem:
+                text = clean_text(journal_elem.get_text())
+                if text and text.lower() not in ['science.org', 'science']:
+                    return text
+    
+    # Fallback: extract from URL pattern or default to Science
+    # Science journals follow pattern: science.org/doi/...
+    return "Science"
+
 def parse_science_authors(url: str):
     # FIXED: Complete browser headers that actually work
     headers = {
@@ -144,10 +174,11 @@ def parse_science_authors(url: str):
             if label and content:
                 notes_info[label.get_text(strip=True)] = content.get_text(" ", strip=True)
 
-    # Extract abstract, publication date, and title
+    # Extract abstract, publication date, title, and journal name
     abstract = _extract_abstract(soup)
     publication_date = _extract_publication_date(soup)
     title = _extract_title(soup)
+    journal_name = _extract_journal_name(soup)
 
     result = {
         "authors": authors_data,
@@ -156,6 +187,7 @@ def parse_science_authors(url: str):
         "abstract": abstract,
         "publication_date": publication_date,
         "title": title,
+        "journal_name": journal_name,
         "url": url
     }
 
