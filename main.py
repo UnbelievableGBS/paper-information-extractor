@@ -7,6 +7,7 @@ import aps_extractor as ae
 import pandas as pd
 import os
 import re
+from aps_craw import crawl_aps
 
 api_key = os.getenv("DEEPSEEK_API_KEY", "sk-9d3e8463fbf34fb4ab915bef2baa9ba3")
 client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
@@ -90,15 +91,14 @@ system_prompt = """
 
 该研究的第一作者Linda Mauron来自瑞士洛桑联邦理工学院物理研究所和量子科学与工程中心，通讯作者为Giuseppe Carleo教授。研究团队指出，L.M.负责编写代码和进行模拟计算，并在Z.D.的协助下完成数据分析，所有作者共同参与了方法设计和结果讨论，L.M.在全体成员的指导下完成了论文撰写工作。这项研究完全在瑞士完成。
 
-论文信息提取：第一作者/共同作者单位：洛桑联邦理工学院，通讯作者单位：洛桑联邦理工学院*，其他作者单位；洛桑联邦理工学院，所有作者单位所属国家：瑞士，论文url链接：https://www.nature.com/articles/s41567-025-02944-3，论文名：Predicting topological entanglement entropy in a Rydberg analogue simulator
+论文信息提取：第一作者/共同作者单位/通讯作者单位：洛桑联邦理工学院*，其他作者单位：洛桑联邦理工学院，所有作者单位所属国家：瑞士，论文url链接：https://www.nature.com/articles/s41567-025-02944-3，论文名：Predicting topological entanglement entropy in a Rydberg analogue simulator
 """
 
 def extract_paper_info(response_text):
     """Extract structured data from LLM response using regex patterns."""
     patterns = {
         "新闻风格介绍": r"新闻风格介绍：(.*?)论文信息提取：",
-        "第一作者单位": r"第一作者/共同作者单位：(.*?)，通讯作者单位：",
-        "通讯作者单位": r"通讯作者单位：(.*?)，其他作者单位：",
+        "第一作者单位/共同作者单位/通讯作者单位": r"第一作者/共同作者单位/通讯作者单位：(.*?)，其他作者单位：",
         "其他作者单位": r"其他作者单位：(.*?)，所有作者单位所属国家：",
         "单位所属国家": r"所有作者单位所属国家：(.*?)，论文url链接：",
         "url": r"论文url链接：(.*?)，论文名：",
@@ -138,6 +138,31 @@ def process_paper(paper_data):
         print(f"Error processing {url}: {e}")
         return None
 
+def process_aps_paper(paper_data):
+    """Process a single paper and return structured data."""
+    try:
+        # paper_data is already a dictionary from crawl_aps()
+        content = paper_data["content"]
+        print(f"Paper data: {content}")
+        
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": content},
+            ],
+            stream=False
+        )
+        
+        response_text = response.choices[0].message.content
+        print(f"LLM Response: {response_text}")
+        
+        return extract_paper_info(response_text)
+        
+    except Exception as e:
+        print(f"Error processing {url}: {e}")
+        return None
+
 def main(url):
     if "nature" in url:
         paper_data = ne.parse_nature_authors(url)
@@ -146,8 +171,9 @@ def main(url):
         paper_data = se.parse_science_authors(url)
         extracted_data = process_paper(paper_data)
     elif "aps" in url:
-        paper_data = ae.scrape_aps_authors(url)
-        extracted_data = process_paper(paper_data)
+        paper_data = crawl_aps(url)
+        print(f"Paper data: {paper_data}")
+        extracted_data = process_aps_paper(paper_data)
     else:
         print("Invalid URL")
         exit()
